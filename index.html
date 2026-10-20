@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full w-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCEANUM 3D - Deep Blue Cetacean Simulation</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js & Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030814;
+            color: #e2e8f0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Custom Glassmorphism UI */
+        .glass-panel {
+            background: rgba(6, 18, 38, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-button:hover {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .glass-button.active {
+            background: rgba(14, 165, 233, 0.3);
+            border-color: #38bdf8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Custom Scrollbar for Controls */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.3);
+            border-radius: 4px;
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            box-shadow: 0 0 10px #38bdf8;
+        }
+
+        /* Canvas overlay */
+        #webgl-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="h-full w-full overflow-hidden">
+
+    <!-- WebGL Canvas Container -->
+    <div id="webgl-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="h-full w-full flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- Top Bar Header -->
+        <header class="flex justify-between items-start w-full">
+            <div class="glass-panel p-4 rounded-2xl pointer-events-auto flex items-center gap-4">
+                <div class="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
+                    <i data-lucide="waves" class="w-6 h-6 animate-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="font-display text-xl md:text-2xl font-bold tracking-wider text-white flex items-center gap-2">
+                        OCEANUM <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">3D v2.5</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Deep Blue Interactive Whale Simulation</p>
+                </div>
+            </div>
+
+            <!-- Telemetry Display HUD -->
+            <div class="glass-panel p-3 md:p-4 rounded-2xl pointer-events-auto hidden sm:flex items-center gap-6 font-mono text-xs">
+                <div>
+                    <div class="text-slate-400 uppercase tracking-wider text-[10px]">Depth</div>
+                    <div id="telemetry-depth" class="text-cyan-400 font-bold text-sm">24.5 m</div>
+                </div>
+                <div class="h-8 w-px bg-white/10"></div>
+                <div>
+                    <div class="text-slate-400 uppercase tracking-wider text-[10px]">Water Temp</div>
+                    <div class="text-cyan-400 font-bold text-sm">4.2 °C</div>
+                </div>
+                <div class="h-8 w-px bg-white/10"></div>
+                <div>
+                    <div class="text-slate-400 uppercase tracking-wider text-[10px]">Speed</div>
+                    <div id="telemetry-speed" class="text-cyan-400 font-bold text-sm">8.2 kn</div>
+                </div>
+                <div class="h-8 w-px bg-white/10"></div>
+                <div>
+                    <div class="text-slate-400 uppercase tracking-wider text-[10px]">FPS</div>
+                    <div id="telemetry-fps" class="text-emerald-400 font-bold text-sm">60</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Floating Quick Action Buttons & Sound Control -->
+        <div class="flex justify-between items-end w-full">
+            
+            <!-- Left Action Panel -->
+            <div class="glass-panel p-3 md:p-4 rounded-2xl pointer-events-auto flex flex-col gap-2 max-w-[260px] md:max-w-none">
+                <span class="text-[10px] font-mono uppercase tracking-widest text-cyan-400 mb-1">Whale Behavior</span>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <button id="btn-breach" class="glass-button p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 text-slate-200">
+                        <i data-lucide="arrow-up-right" class="w-4 h-4 text-cyan-400"></i> Breach
+                    </button>
+                    <button id="btn-dive" class="glass-button p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 text-slate-200">
+                        <i data-lucide="arrow-down-right" class="w-4 h-4 text-cyan-400"></i> Dive Deep
+                    </button>
+                    <button id="btn-pulse" class="glass-button p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 text-slate-200">
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Bio-Pulse
+                    </button>
+                    <button id="btn-song" class="glass-button p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 text-slate-200">
+                        <i data-lucide="music" class="w-4 h-4 text-pink-400"></i> Whale Song
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Toggle Sidebar Controls Panel -->
+            <div class="glass-panel p-4 rounded-2xl pointer-events-auto flex flex-col gap-4 w-72 max-h-[70vh] overflow-y-auto">
+                
+                <!-- Audio Toggle Section -->
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                        <i data-lucide="volume-2" class="w-4 h-4 text-cyan-400"></i> Ocean Hydrophone
+                    </span>
+                    <button id="btn-audio" class="glass-button p-2 rounded-lg text-slate-400 hover:text-white">
+                        <i data-lucide="volume-x" id="icon-audio-off" class="w-4 h-4"></i>
+                        <i data-lucide="volume-2" id="icon-audio-on" class="w-4 h-4 hidden text-cyan-400"></i>
+                    </button>
+                </div>
+
+                <!-- Visual Mode Render Selector -->
+                <div>
+                    <label class="text-[10px] font-mono uppercase tracking-widest text-slate-400 block mb-2">Render Mode</label>
+                    <div class="grid grid-cols-3 gap-1 bg-black/30 p-1 rounded-xl">
+                        <button id="mode-ocean" class="glass-button active py-1.5 rounded-lg text-[11px] font-medium text-center">Ocean</button>
+                        <button id="mode-neon" class="glass-button py-1.5 rounded-lg text-[11px] font-medium text-center">Biolum</button>
+                        <button id="mode-cyber" class="glass-button py-1.5 rounded-lg text-[11px] font-medium text-center">Wire</button>
+                    </div>
+                </div>
+
+                <!-- Navigation Swim Mode Selector -->
+                <div>
+                    <label class="text-[10px] font-mono uppercase tracking-widest text-slate-400 block mb-2">Swim Kinematics</label>
+                    <div class="grid grid-cols-2 gap-1 bg-black/30 p-1 rounded-xl">
+                        <button id="swim-cruise" class="glass-button active py-1.5 rounded-lg text-[11px] font-medium">Free Cruise</button>
+                        <button id="swim-follow" class="glass-button py-1.5 rounded-lg text-[11px] font-medium">Follow Cursor</button>
+                    </div>
+                </div>
+
+                <!-- Camera Target View Selector -->
+                <div>
+                    <label class="text-[10px] font-mono uppercase tracking-widest text-slate-400 block mb-2">Camera Tracking</label>
+                    <div class="grid grid-cols-2 gap-1 bg-black/30 p-1 rounded-xl">
+                        <button id="cam-orbit" class="glass-button active py-1.5 rounded-lg text-[11px] font-medium">Orbit View</button>
+                        <button id="cam-chase" class="glass-button py-1.5 rounded-lg text-[11px] font-medium">Chase Cam</button>
+                    </div>
+                </div>
+
+                <!-- Environmental Tuning Sliders -->
+                <div class="space-y-3 pt-2 border-t border-white/10">
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+                            <span>Swimming Speed</span>
+                            <span id="val-speed" class="text-cyan-400">1.0x</span>
+                        </div>
+                        <input id="slider-speed" type="range" min="0.2" max="2.5" step="0.1" value="1.0" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+                            <span>Ocean Wave Height</span>
+                            <span id="val-waves" class="text-cyan-400">1.5m</span>
+                        </div>
+                        <input id="slider-waves" type="range" min="0.1" max="4.0" step="0.1" value="1.5" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+                            <span>Particle Field Density</span>
+                            <span id="val-particles" class="text-cyan-400">100%</span>
+                        </div>
+                        <input id="slider-particles" type="range" min="20" max="200" step="10" value="100" class="w-full">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Main WebGL Application Script -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        /* ----------------------------------------------------------------------
+           GLSL SHADERS FOR OCEAN & WHALE MATERIALS
+           ---------------------------------------------------------------------- */
+        
+        // Custom Shader for Realistic Underwater Whale Skin
+        const WhaleShader = {
+            uniforms: {
+                uTime: { value: 0 },
+                uMode: { value: 0 }, // 0: Realistic, 1: Bioluminescent, 2: Cyber Wire
+                uPulse: { value: 0.0 },
+                uLightPosition: { value: new THREE.Vector3(10, 50, 10) },
+                uBaseColor: { value: new THREE.Color(0x1a2b3c) },
+                uBiolumColor: { value: new THREE.Color(0x00f3ff) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                varying vec2 vUv;
+                
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                uniform int uMode;
+                uniform float uPulse;
+                uniform vec3 uLightPosition;
+                uniform vec3 uBaseColor;
+                uniform vec3 uBiolumColor;
+
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                varying vec2 vUv;
+
+                // Procedural Caustics Pattern Simulation
+                float caustics(vec2 p) {
+                    return sin(p.x * 4.0 + uTime * 2.0) * cos(p.y * 4.0 + uTime * 1.5) * 0.5 + 0.5;
+                }
+
+                void main() {
+                    vec3 normal = normalize(vNormal);
+                    vec3 lightDir = normalize(uLightPosition - vWorldPosition);
+                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+
+                    // Basic Lighting Diffuse
+                    float diff = max(dot(normal, lightDir), 0.1);
+                    
+                    // Underwater Rim Light / Fresnel Effect
+                    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+                    vec3 rimColor = vec3(0.1, 0.6, 0.9) * fresnel * 1.5;
+
+                    // Simulated Caustic Projection from Above
+                    float causticPattern = caustics(vWorldPosition.xz * 0.1) * max(normal.y, 0.0);
+                    vec3 causticColor = vec3(0.2, 0.8, 1.0) * causticPattern * 0.5;
+
+                    if (uMode == 0) {
+                        // Realistic Mode
+                        vec3 finalColor = uBaseColor * diff + rimColor + causticColor;
+                        gl_FragColor = vec4(finalColor, 0.95);
+                    } 
+                    else if (uMode == 1) {
+                        // Bioluminescent Cyber Neon Mode
+                        float stripe = sin(vWorldPosition.z * 1.5 + uTime * 3.0) * 0.5 + 0.5;
+                        float bioGlow = smoothstep(0.3, 0.8, stripe) + uPulse;
+                        vec3 neon = mix(vec3(0.02, 0.05, 0.15), uBiolumColor, bioGlow * 0.8 + fresnel);
+                        gl_FragColor = vec4(neon + rimColor, 1.0);
+                    } 
+                    else {
+                        // Cyber Wireframe Matrix Mode
+                        vec3 wire = mix(vec3(0.0, 0.2, 0.4), vec3(0.0, 1.0, 0.8), fresnel + uPulse);
+                        gl_FragColor = vec4(wire, 0.8);
+                    }
+                }
+            `
+        };
+
+        // Custom Water Surface Shader with Vertex Displacement Waves
+        const WaterShader = {
+            uniforms: {
+                uTime: { value: 0 },
+                uWaveHeight: { value: 1.5 },
+                uDeepColor: { value: new THREE.Color(0x021027) },
+                uSurfaceColor: { value: new THREE.Color(0x0077be) }
+            },
+            vertexShader: `
+                uniform float uTime;
+                uniform float uWaveHeight;
+                varying vec3 vWorldPosition;
+                varying float vElevation;
+
+                void main() {
+                    vec3 pos = position;
+                    
+                    // Sum of sine waves for complex wave motion
+                    float wave1 = sin(pos.x * 0.05 + uTime * 1.2) * cos(pos.z * 0.05 + uTime * 1.0) * uWaveHeight;
+                    float wave2 = sin(pos.x * 0.1 - uTime * 1.5) * sin(pos.z * 0.1 + uTime * 1.1) * (uWaveHeight * 0.5);
+                    pos.y += wave1 + wave2;
+
+                    vElevation = pos.y;
+                    vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 uDeepColor;
+                uniform vec3 uSurfaceColor;
+                varying vec3 vWorldPosition;
+                varying float vElevation;
+
+                void main() {
+                    float mixFactor = smoothstep(-2.0, 2.0, vElevation);
+                    vec3 color = mix(uDeepColor, uSurfaceColor, mixFactor);
+                    
+                    // Add subtle foam effect at wave peaks
+                    if (vElevation > 1.2) {
+                        color += vec3(0.2, 0.3, 0.3) * (vElevation - 1.2);
+                    }
+
+                    gl_FragColor = vec4(color, 0.82);
+                }
+            `
+        };
+
+        /* ----------------------------------------------------------------------
+           MAIN SIMULATION ENGINE CLASS
+           ---------------------------------------------------------------------- */
+        class OceanumSimulation {
+            constructor() {
+                this.container = document.getElementById('webgl-container');
+                this.clock = new THREE.Clock();
+                this.mouse = new THREE.Vector2();
+                this.targetMouse = new THREE.Vector2();
+
+                // Simulation Settings State
+                this.settings = {
+                    speed: 1.0,
+                    waveHeight: 1.5,
+                    particleDensity: 100,
+                    renderMode: 0, // 0: Ocean, 1: Biolum, 2: Cyber
+                    swimMode: 'cruise', // 'cruise', 'follow'
+                    cameraMode: 'orbit', // 'orbit', 'chase'
+                    audioEnabled: false
+                };
+
+                // State Data
+                this.fps = 60;
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+
+                this.initScene();
+                this.initLights();
+                this.initOcean();
+                this.initWhale();
+                this.initParticles();
+                this.initVolumetricGodRays();
+                this.initAudio();
+                this.setupEventListeners();
+
+                this.animate();
+            }
+
+            initScene() {
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x020a18);
+                this.scene.fog = new THREE.FogExp2(0x020a18, 0.008);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 5, 45);
+
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Controls
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.maxDistance = 120;
+                this.controls.minDistance = 10;
+                this.controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go far under bottom floor
+            }
+
+            initLights() {
+                // Ambient Light
+                const ambientLight = new THREE.AmbientLight(0x0a2540, 1.2);
+                this.scene.add(ambientLight);
+
+                // Sun Directional Light (Overhead surface light)
+                this.sunLight = new THREE.DirectionalLight(0x38bdf8, 2.5);
+                this.sunLight.position.set(20, 80, 20);
+                this.scene.add(this.sunLight);
+
+                // Deep Water Blue Point Light
+                const deepLight = new THREE.PointLight(0x00f3ff, 1.5, 80);
+                deepLight.position.set(0, -20, 0);
+                this.scene.add(deepLight);
+            }
+
+            initOcean() {
+                // Water Surface Plane Mesh
+                const geometry = new THREE.PlaneGeometry(300, 300, 128, 128);
+                geometry.rotateX(-Math.PI / 2);
+
+                this.waterMaterial = new THREE.ShaderMaterial({
+                    vertexShader: WaterShader.vertexShader,
+                    fragmentShader: WaterShader.fragmentShader,
+                    uniforms: THREE.UniformsUtils.clone(WaterShader.uniforms),
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+
+                this.waterSurface = new THREE.Mesh(geometry, this.waterMaterial);
+                this.waterSurface.position.y = 15; // Surface Level
+                this.scene.add(this.waterSurface);
+            }
+
+            initWhale() {
+                // Procedural High-Detail Whale Mesh & Skeleton Hierarchy Construction
+                this.whaleGroup = new THREE.Group();
+
+                // Whale Shader Material setup
+                this.whaleMaterial = new THREE.ShaderMaterial({
+                    vertexShader: WhaleShader.vertexShader,
+                    fragmentShader: WhaleShader.fragmentShader,
+                    uniforms: THREE.UniformsUtils.clone(WhaleShader.uniforms),
+                    transparent: true
+                });
+
+                // Construct Body Segments using procedural geometry
+                // Main Torso / Spine Nodes array for Kinematics animation
+                this.spineNodes = [];
+                const segmentCount = 9;
+                const bodyLength = 22;
+
+                let parentGroup = this.whaleGroup;
+
+                for (let i = 0; i < segmentCount; i++) {
+                    const nodeGroup = new THREE.Group();
+                    const progress = i / (segmentCount - 1);
+                    
+                    // Determine radius profile of whale body (taper head & tail)
+                    let radius = Math.sin(progress * Math.PI) * 2.8;
+                    if (i === 0) radius = 1.8; // Head tip
+                    if (i === 1) radius = 2.6; // Head bulge
+                    
+                    const segLength = bodyLength / segmentCount;
+                    const geo = new THREE.CylinderGeometry(
+                        radius * (i === 0 ? 0.7 : 1), 
+                        radius, 
+                        segLength, 
+                        16
+                    );
+                    geo.rotateX(Math.PI / 2); // Align with spine along Z-axis
+
+                    const mesh = new THREE.Mesh(geo, this.whaleMaterial);
+                    mesh.position.z = -segLength / 2;
+                    nodeGroup.add(mesh);
+
+                    // Add Specific Features on relative body nodes
+                    if (i === 1) {
+                        // Head / Rostrum / Blowhole
+                        const headTop = new THREE.Mesh(
+                            new THREE.SphereGeometry(2.3, 16, 16),
+                            this.whaleMaterial
+                        );
+                        headTop.position.set(0, 0.2, -0.5);
+                        headTop.scale.set(0.9, 0.7, 1.2);
+                        nodeGroup.add(headTop);
+                    }
+
+                    if (i === 2) {
+                        // Side Pectoral Flippers (Left & Right)
+                        const flipperGeo = new THREE.BoxGeometry(7, 0.3, 1.8);
+                        flipperGeo.translate(3.5, 0, 0); // Origin at joint
+
+                        this.leftFlipper = new THREE.Mesh(flipperGeo, this.whaleMaterial);
+                        this.leftFlipper.position.set(2.2, -0.5, 0);
+                        this.leftFlipper.rotation.z = -0.3;
+                        this.leftFlipper.rotation.y = -0.4;
+
+                        this.rightFlipper = new THREE.Mesh(flipperGeo, this.whaleMaterial);
+                        this.rightFlipper.position.set(-2.2, -0.5, 0);
+                        this.rightFlipper.scale.x = -1; // Flip opposite side
+                        this.rightFlipper.rotation.z = 0.3;
+                        this.rightFlipper.rotation.y = 0.4;
+
+                        nodeGroup.add(this.leftFlipper);
+                        nodeGroup.add(this.rightFlipper);
+                    }
+
+                    if (i === segmentCount - 1) {
+                        // Fluke / Tail Fin
+                        const flukeShape = new THREE.Shape();
+                        flukeShape.moveTo(0, 0);
+                        flukeShape.quadraticCurveTo(3, 2, 7, 0.5);
+                        flukeShape.quadraticCurveTo(4, -1, 0, -0.5);
+                        flukeShape.quadraticCurveTo(-4, -1, -7, 0.5);
+                        flukeShape.quadraticCurveTo(-3, 2, 0, 0);
+
+                        const extrudeSettings = { depth: 0.3, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 };
+                        const flukeGeo = new THREE.ExtrudeGeometry(flukeShape, extrudeSettings);
+                        flukeGeo.rotateX(Math.PI / 2);
+
+                        this.tailFluke = new THREE.Mesh(flukeGeo, this.whaleMaterial);
+                        this.tailFluke.position.set(0, 0, -segLength);
+                        nodeGroup.add(this.tailFluke);
+                    }
+
+                    // Hierarchy Linking
+                    nodeGroup.position.set(0, 0, i === 0 ? 0 : -segLength);
+                    parentGroup.add(nodeGroup);
+                    parentGroup = nodeGroup;
+                    this.spineNodes.push(nodeGroup);
+                }
+
+                this.whaleGroup.position.set(0, -2, 0);
+                this.scene.add(this.whaleGroup);
+
+                // Kinematic Tracking Parameters
+                this.whaleState = {
+                    position: new THREE.Vector3(0, -2, 0),
+                    targetPosition: new THREE.Vector3(0, -2, 0),
+                    rotation: new THREE.Euler(),
+                    speed: 0.2,
+                    swimPhase: 0,
+                    isBreaching: false,
+                    isDiving: false
+                };
+            }
+
+            initParticles() {
+                // Ambient Ocean Plankton / Floating Particles
+                const particleCount = 1200;
+                const geo = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const scales = new Float32Array(particleCount);
+
+                for (let i = 0; i < particleCount * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 160;
+                    positions[i + 1] = (Math.random() - 0.5) * 80;
+                    positions[i + 2] = (Math.random() - 0.5) * 160;
+                    scales[i / 3] = Math.random() * 0.8 + 0.2;
+                }
+
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geo.setAttribute('scale', new THREE.BufferAttribute(scales, 1));
+
+                const particleMat = new THREE.PointsMaterial({
+                    color: 0x38bdf8,
+                    size: 0.6,
+                    transparent: true,
+                    opacity: 0.6,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.planktonParticles = new THREE.Points(geo, particleMat);
+                this.scene.add(this.planktonParticles);
+
+                // Water Splash Particle Emitter System (Breaching Effect)
+                const splashCount = 300;
+                const splashGeo = new THREE.BufferGeometry();
+                this.splashPositions = new Float32Array(splashCount * 3);
+                this.splashVelocities = [];
+
+                for (let i = 0; i < splashCount; i++) {
+                    this.splashPositions[i * 3] = 0;
+                    this.splashPositions[i * 3 + 1] = -100; // Hide underground initial
+                    this.splashPositions[i * 3 + 2] = 0;
+                    this.splashVelocities.push(new THREE.Vector3());
+                }
+
+                splashGeo.setAttribute('position', new THREE.BufferAttribute(this.splashPositions, 3));
+                const splashMat = new THREE.PointsMaterial({
+                    color: 0xe0f2fe,
+                    size: 1.2,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.splashParticles = new THREE.Points(splashGeo, splashMat);
+                this.scene.add(this.splashParticles);
+            }
+
+            initVolumetricGodRays() {
+                // Volumetric Underwater Light Shafts
+                const rayCount = 8;
+                this.godRays = new THREE.Group();
+
+                for (let i = 0; i < rayCount; i++) {
+                    const geo = new THREE.CylinderGeometry(0.5, 8 + Math.random() * 6, 80, 16, 1, true);
+                    const mat = new THREE.MeshBasicMaterial({
+                        color: 0x38bdf8,
+                        transparent: true,
+                        opacity: 0.08 + Math.random() * 0.05,
+                        side: THREE.DoubleSide,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+
+                    const ray = new THREE.Mesh(geo, mat);
+                    ray.position.set(
+                        (Math.random() - 0.5) * 80,
+                        10,
+                        (Math.random() - 0.5) * 80
+                    );
+                    ray.rotation.z = (Math.random() - 0.5) * 0.3;
+                    ray.rotation.x = (Math.random() - 0.5) * 0.3;
+                    this.godRays.add(ray);
+                }
+
+                this.scene.add(this.godRays);
+            }
+
+            initAudio() {
+                // Procedural Web Audio API Sound Generator (No external audio files required)
+                this.audioCtx = null;
+            }
+
+            startAudioEngine() {
+                if (this.audioCtx) return;
+
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.audioCtx = new AudioContext();
+
+                // Ambient Ocean Hydrophone Hum Generator
+                const bufferSize = this.audioCtx.sampleRate * 2;
+                const noiseBuffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const whiteNoise = this.audioCtx.createBufferSource();
+                whiteNoise.buffer = noiseBuffer;
+                whiteNoise.loop = true;
+
+                // Deep Water Lowpass Filter
+                const filter = this.audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(180, this.audioCtx.currentTime);
+
+                this.ambientGain = this.audioCtx.createGain();
+                this.ambientGain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
+
+                whiteNoise.connect(filter);
+                filter.connect(this.ambientGain);
+                this.ambientGain.connect(this.audioCtx.destination);
+                whiteNoise.start();
+            }
+
+            playWhaleSong() {
+                if (!this.audioCtx || !this.settings.audioEnabled) return;
+
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'sine';
+                
+                // Frequency Slide for Authentic Whale Call Waveform
+                const now = this.audioCtx.currentTime;
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 1.2);
+                osc.frequency.exponentialRampToValueAtTime(220, now + 2.5);
+
+                gain.gain.setValueAtTime(0.01, now);
+                gain.gain.linearRampToValueAtTime(0.3, now + 0.5);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 3.0);
+            }
+
+            playSplashSound() {
+                if (!this.audioCtx || !this.settings.audioEnabled) return;
+
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.8);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.8);
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.onWindowResize());
+
+                // Track Mouse Movement
+                window.addEventListener('mousemove', (e) => {
+                    this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                });
+
+                // UI Mode Selectors
+                document.getElementById('mode-ocean').addEventListener('click', (e) => this.setRenderMode(0, e.target));
+                document.getElementById('mode-neon').addEventListener('click', (e) => this.setRenderMode(1, e.target));
+                document.getElementById('mode-cyber').addEventListener('click', (e) => this.setRenderMode(2, e.target));
+
+                document.getElementById('swim-cruise').addEventListener('click', (e) => this.setSwimMode('cruise', e.target));
+                document.getElementById('swim-follow').addEventListener('click', (e) => this.setSwimMode('follow', e.target));
+
+                document.getElementById('cam-orbit').addEventListener('click', (e) => this.setCameraMode('orbit', e.target));
+                document.getElementById('cam-chase').addEventListener('click', (e) => this.setCameraMode('chase', e.target));
+
+                // Action Buttons
+                document.getElementById('btn-breach').addEventListener('click', () => this.triggerBreach());
+                document.getElementById('btn-dive').addEventListener('click', () => this.triggerDive());
+                document.getElementById('btn-pulse').addEventListener('click', () => this.triggerBioPulse());
+                document.getElementById('btn-song').addEventListener('click', () => this.playWhaleSong());
+
+                // Audio Toggle
+                document.getElementById('btn-audio').addEventListener('click', () => {
+                    this.settings.audioEnabled = !this.settings.audioEnabled;
+                    document.getElementById('icon-audio-off').classList.toggle('hidden', this.settings.audioEnabled);
+                    document.getElementById('icon-audio-on').classList.toggle('hidden', !this.settings.audioEnabled);
+                    
+                    if (this.settings.audioEnabled) {
+                        this.startAudioEngine();
+                    } else if (this.ambientGain) {
+                        this.ambientGain.gain.setValueAtTime(0, this.audioCtx.currentTime);
+                    }
+                });
+
+                // Sliders
+                document.getElementById('slider-speed').addEventListener('input', (e) => {
+                    this.settings.speed = parseFloat(e.target.value);
+                    document.getElementById('val-speed').innerText = `${this.settings.speed.toFixed(1)}x`;
+                });
+
+                document.getElementById('slider-waves').addEventListener('input', (e) => {
+                    this.settings.waveHeight = parseFloat(e.target.value);
+                    this.waterMaterial.uniforms.uWaveHeight.value = this.settings.waveHeight;
+                    document.getElementById('val-waves').innerText = `${this.settings.waveHeight.toFixed(1)}m`;
+                });
+
+                document.getElementById('slider-particles').addEventListener('input', (e) => {
+                    this.settings.particleDensity = parseInt(e.target.value);
+                    document.getElementById('val-particles').innerText = `${this.settings.particleDensity}%`;
+                    this.planktonParticles.geometry.setDrawRange(0, Math.floor(1200 * (this.settings.particleDensity / 100)));
+                });
+            }
+
+            setRenderMode(mode, targetBtn) {
+                this.settings.renderMode = mode;
+                this.whaleMaterial.uniforms.uMode.value = mode;
+
+                // Update UI active buttons
+                ['mode-ocean', 'mode-neon', 'mode-cyber'].forEach(id => {
+                    document.getElementById(id).classList.remove('active');
+                });
+                targetBtn.classList.add('active');
+
+                // Adjust Wireframe mode
+                this.whaleMaterial.wireframe = (mode === 2);
+            }
+
+            setSwimMode(mode, targetBtn) {
+                this.settings.swimMode = mode;
+                ['swim-cruise', 'swim-follow'].forEach(id => {
+                    document.getElementById(id).classList.remove('active');
+                });
+                targetBtn.classList.add('active');
+            }
+
+            setCameraMode(mode, targetBtn) {
+                this.settings.cameraMode = mode;
+                ['cam-orbit', 'cam-chase'].forEach(id => {
+                    document.getElementById(id).classList.remove('active');
+                });
+                targetBtn.classList.add('active');
+            }
+
+            triggerBreach() {
+                if (this.whaleState.isBreaching) return;
+                this.whaleState.isBreaching = true;
+
+                this.playWhaleSong();
+
+                // Sequence Breach using GSAP Timeline
+                const tl = gsap.timeline({
+                    onComplete: () => {
+                        this.whaleState.isBreaching = false;
+                    }
+                });
+
+                // Dive down first, then leap up through water surface!
+                tl.to(this.whaleGroup.position, {
+                    y: -18,
+                    z: this.whaleGroup.position.z + 10,
+                    duration: 2,
+                    ease: "power2.inOut"
+                })
+                .to(this.whaleGroup.rotation, {
+                    x: Math.PI / 4,
+                    duration: 1.5,
+                    ease: "power1.out"
+                }, "<")
+                .to(this.whaleGroup.position, {
+                    y: 22, // Breach above water surface!
+                    z: this.whaleGroup.position.z - 20,
+                    duration: 2.2,
+                    ease: "power2.out",
+                    onUpdate: () => {
+                        // Check surface crossing for splash particles
+                        if (this.whaleGroup.position.y > 14 && this.whaleGroup.position.y < 18) {
+                            this.emitSplashParticles(this.whaleGroup.position);
+                        }
+                    }
+                })
+                .to(this.whaleGroup.rotation, {
+                    x: -Math.PI / 3, // Curve belly back down
+                    duration: 1.8,
+                    ease: "power1.inOut"
+                }, "-=1.2")
+                .to(this.whaleGroup.position, {
+                    y: -5,
+                    duration: 2.0,
+                    ease: "power2.in",
+                    onStart: () => this.playSplashSound()
+                });
+            }
+
+            triggerDive() {
+                if (this.whaleState.isBreaching) return;
+
+                gsap.to(this.whaleGroup.position, {
+                    y: -32,
+                    duration: 3.5,
+                    ease: "power2.inOut",
+                    onComplete: () => {
+                        gsap.to(this.whaleGroup.position, {
+                            y: -5,
+                            duration: 4.0,
+                            delay: 2.0,
+                            ease: "power1.inOut"
+                        });
+                    }
+                });
+
+                gsap.to(this.whaleGroup.rotation, {
+                    x: -Math.PI / 6,
+                    duration: 2.0,
+                    yoyo: true,
+                    repeat: 1
+                });
+            }
+
+            triggerBioPulse() {
+                gsap.to(this.whaleMaterial.uniforms.uPulse, {
+                    value: 2.0,
+                    duration: 0.6,
+                    yoyo: true,
+                    repeat: 1,
+                    ease: "power2.out"
+                });
+            }
+
+            emitSplashParticles(pos) {
+                const positions = this.splashParticles.geometry.attributes.position.array;
+                const count = positions.length / 3;
+
+                for (let i = 0; i < count; i++) {
+                    positions[i * 3] = pos.x + (Math.random() - 0.5) * 10;
+                    positions[i * 3 + 1] = 15; // Water surface level
+                    positions[i * 3 + 2] = pos.z + (Math.random() - 0.5) * 10;
+
+                    this.splashVelocities[i].set(
+                        (Math.random() - 0.5) * 15,
+                        Math.random() * 20 + 10,
+                        (Math.random() - 0.5) * 15
+                    );
+                }
+                this.splashParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            updateSplashParticles(delta) {
+                const positions = this.splashParticles.geometry.attributes.position.array;
+                const count = positions.length / 3;
+
+                for (let i = 0; i < count; i++) {
+                    if (positions[i * 3 + 1] > -50) {
+                        // Apply gravity
+                        this.splashVelocities[i].y -= 35 * delta;
+
+                        positions[i * 3] += this.splashVelocities[i].x * delta;
+                        positions[i * 3 + 1] += this.splashVelocities[i].y * delta;
+                        positions[i * 3 + 2] += this.splashVelocities[i].z * delta;
+                    }
+                }
+                this.splashParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            updateWhaleKinematics(delta, time) {
+                this.whaleState.swimPhase += delta * 3.5 * this.settings.speed;
+
+                // Spine undulation wave propagation math
+                const waveFreq = 0.6;
+                const waveAmp = 0.22;
+
+                this.spineNodes.forEach((node, index) => {
+                    if (index === 0) return; // Root node
+                    
+                    // Delay phase per segment along body length
+                    const phaseOffset = index * waveFreq;
+                    const flexAngle = Math.sin(this.whaleState.swimPhase - phaseOffset) * waveAmp;
+
+                    // Lateral yaw movement (swimming horizontal wave)
+                    node.rotation.y = flexAngle * 0.8;
+                    
+                    // Pitch pitch movement (fluke vertical lift beat)
+                    node.rotation.x = Math.cos(this.whaleState.swimPhase - phaseOffset) * (waveAmp * 0.4);
+                });
+
+                // Roll Pectoral Flippers synchronized with phase
+                if (this.leftFlipper && this.rightFlipper) {
+                    this.leftFlipper.rotation.x = Math.sin(this.whaleState.swimPhase) * 0.2;
+                    this.rightFlipper.rotation.x = Math.sin(this.whaleState.swimPhase) * 0.2;
+                }
+
+                // Swim Navigation Modes
+                if (!this.whaleState.isBreaching) {
+                    if (this.settings.swimMode === 'cruise') {
+                        // Autonomous Circular Graceful Orbit Path
+                        const radius = 32;
+                        const orbitSpeed = 0.2 * this.settings.speed;
+                        
+                        this.whaleState.targetPosition.x = Math.sin(time * orbitSpeed) * radius;
+                        this.whaleState.targetPosition.z = Math.cos(time * orbitSpeed) * radius;
+                        this.whaleState.targetPosition.y = -4 + Math.sin(time * 0.5) * 3;
+                    } 
+                    else if (this.settings.swimMode === 'follow') {
+                        // Track Mouse Raycast position in 3D Space
+                        this.whaleState.targetPosition.x = this.mouse.x * 35;
+                        this.whaleState.targetPosition.y = Math.max(-28, Math.min(10, this.mouse.y * 25));
+                        this.whaleState.targetPosition.z = 0;
+                    }
+
+                    // Smooth Lerp Position Towards Target
+                    this.whaleGroup.position.lerp(this.whaleState.targetPosition, delta * 0.8 * this.settings.speed);
+
+                    // Turn/Orient Body Facing Swim Direction Vector
+                    const moveDir = new THREE.Vector3().subVectors(this.whaleState.targetPosition, this.whaleGroup.position);
+                    if (moveDir.lengthSq() > 0.1) {
+                        const targetRotationY = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
+                        
+                        // Smooth quaternion rotation turn
+                        const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+                            -moveDir.y * 0.03, // Pitch angle based on ascent/descent
+                            targetRotationY,
+                            (this.whaleGroup.rotation.y - targetRotationY) * 0.5 // Roll turn bank
+                        ));
+                        
+                        this.whaleGroup.quaternion.slerp(targetQuat, delta * 2.0);
+                    }
+                }
+            }
+
+            updateTelemetry() {
+                // Update HUD Numbers
+                const depth = Math.max(0, (15 - this.whaleGroup.position.y)).toFixed(1);
+                const currentSpeed = (6 + Math.sin(this.whaleState.swimPhase) * 2.5 * this.settings.speed).toFixed(1);
+
+                document.getElementById('telemetry-depth').innerText = `${depth} m`;
+                document.getElementById('telemetry-speed').innerText = `${currentSpeed} kn`;
+
+                // Calculate FPS
+                this.frameCount++;
+                const now = performance.now();
+                if (now - this.lastTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / (now - this.lastTime));
+                    document.getElementById('telemetry-fps').innerText = this.fps;
+                    this.frameCount = 0;
+                    this.lastTime = now;
+                }
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const delta = this.clock.getDelta();
+                const time = this.clock.getElapsedTime();
+
+                // Update Shaders Time Uniforms
+                this.whaleMaterial.uniforms.uTime.value = time;
+                this.waterMaterial.uniforms.uTime.value = time;
+
+                // Update Whale Physics & Skeleton
+                this.updateWhaleKinematics(delta, time);
+
+                // Update Particles
+                this.updateSplashParticles(delta);
+                if (this.planktonParticles) {
+                    this.planktonParticles.rotation.y = time * 0.02;
+                }
+
+                // Update Camera Modes
+                if (this.settings.cameraMode === 'chase') {
+                    // Position camera behind whale
+                    const relativeOffset = new THREE.Vector3(0, 8, -25);
+                    const cameraOffset = relativeOffset.applyMatrix4(this.whaleGroup.matrixWorld);
+                    
+                    this.camera.position.lerp(cameraOffset, delta * 2.0);
+                    this.controls.target.lerp(this.whaleGroup.position, delta * 3.0);
+                } else {
+                    this.controls.target.lerp(this.whaleGroup.position, delta * 1.5);
+                }
+
+                this.controls.update();
+                this.updateTelemetry();
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Initialize Simulation on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            new OceanumSimulation();
+        });
+    </script>
+</body>
+</html>
