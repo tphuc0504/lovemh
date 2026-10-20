@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiệu Ứng Trái Tim 3D Glowing Particles</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #030008;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+
+        .cursive-font {
+            font-family: 'Dancing Script', cursive;
+        }
+
+        /* Glassmorphism UI */
+        .glass-panel {
+            background: rgba(15, 5, 25, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 105, 180, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(255, 20, 147, 0.2);
+        }
+
+        /* Glow animation for text */
+        .glow-text {
+            text-shadow: 0 0 10px rgba(255, 105, 180, 0.8),
+                         0 0 20px rgba(255, 20, 147, 0.6),
+                         0 0 30px rgba(255, 0, 128, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 105, 180, 0.3);
+            border-radius: 4px;
+        }
+
+        /* Canvas styling */
+        #heartCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Click Sparkle Wave */
+        .click-wave {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 182, 193, 0.8);
+            animation: pulse-out 0.8s ease-out forwards;
+            z-index: 2;
+        }
+
+        @keyframes pulse-out {
+            0% {
+                width: 0px;
+                height: 0px;
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+            100% {
+                width: 250px;
+                height: 250px;
+                opacity: 0;
+                transform: translate(-50%, -50%);
+            }
+        }
+    </style>
+</head>
+<body class="w-full h-screen overflow-hidden flex flex-col justify-between relative">
+
+    <!-- ThreeJS WebGL Canvas -->
+    <canvas id="heartCanvas"></canvas>
+
+    <!-- Top Navigation Header -->
+    <header class="relative z-10 w-full p-4 md:p-6 flex justify-between items-center max-w-7xl mx-auto">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 shadow-[0_0_15px_rgba(255,105,180,0.5)]">
+                <i class="fa-solid font-bold fa-heart text-xl animate-pulse"></i>
+            </div>
+            <span class="text-xl font-bold tracking-wider text-pink-200">Love<span class="text-pink-500">Particle</span></span>
+        </div>
+
+        <!-- Controls Trigger Buttons -->
+        <div class="flex items-center space-x-3">
+            <button id="musicToggle" class="glass-panel p-3 rounded-full text-pink-300 hover:text-white hover:border-pink-400 transition-all duration-300 flex items-center justify-center w-11 h-11" title="Bật/Tắt Nhạc">
+                <i id="musicIcon" class="fa-solid fa-music text-lg"></i>
+            </button>
+            <button id="configToggle" class="glass-panel p-3 rounded-full text-pink-300 hover:text-white hover:border-pink-400 transition-all duration-300 flex items-center justify-center w-11 h-11" title="Tùy chỉnh">
+                <i class="fa-solid fa-sliders text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Center Interactive Hint (Fades out) -->
+    <div id="hintText" class="relative z-10 text-center pointer-events-none transition-opacity duration-1000 opacity-80">
+        <p class="text-xs md:text-sm tracking-widest text-pink-300/70 uppercase">
+            <i class="fa-solid fa-hand-pointer mr-1"></i> Chạm / Kéo để xoay & click để tạo sao
+        </p>
+    </div>
+
+    <!-- Bottom Romantic Message Card -->
+    <footer class="relative z-10 w-full p-6 mb-4 text-center max-w-2xl mx-auto">
+        <div class="glass-panel rounded-3xl p-6 md:p-8 border border-pink-500/20 relative overflow-hidden group">
+            <!-- Decorative Subtle Glow inside container -->
+            <div class="absolute -top-12 -left-12 w-28 h-28 bg-pink-500/20 rounded-full blur-2xl group-hover:bg-pink-500/30 transition-all"></div>
+            <div class="absolute -bottom-12 -right-12 w-28 h-28 bg-red-500/20 rounded-full blur-2xl group-hover:bg-red-500/30 transition-all"></div>
+
+            <p id="recipientDisplay" class="text-pink-400 text-sm md:text-base font-semibold tracking-widest uppercase mb-2">Dành tặng cho người đặc biệt</p>
+            <h1 id="romanticMessage" class="cursive-font text-3xl md:text-5xl font-bold text-white glow-text leading-tight my-2">
+                "You make my heart beat in every single second"
+            </h1>
+            <p id="senderDisplay" class="text-xs md:text-sm text-pink-300/80 mt-3 font-light italic">
+                ~ With endless love ~
+            </p>
+        </div>
+    </footer>
+
+    <!-- Side Control Modal / Drawer -->
+    <div id="configModal" class="fixed inset-y-0 right-0 z-50 w-full max-w-xs md:max-w-sm glass-panel transform translate-x-full transition-transform duration-300 ease-in-out p-6 overflow-y-auto flex flex-col justify-between">
+        <div>
+            <div class="flex justify-between items-center pb-4 border-b border-pink-500/20">
+                <h2 class="text-lg font-bold text-pink-300 flex items-center gap-2">
+                    <i class="fa-solid fa-heart-pulse"></i> Cấu hình trái tim
+                </h2>
+                <button id="closeConfig" class="text-gray-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="mt-6 space-y-5 text-sm">
+                <!-- Message Settings -->
+                <div>
+                    <label class="block text-pink-200 mb-1 font-medium">Tên người nhận</label>
+                    <input type="text" id="inputRecipient" value="Dành tặng Em ❤️" class="w-full bg-black/40 border border-pink-500/30 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500 transition">
+                </div>
+
+                <div>
+                    <label class="block text-pink-200 mb-1 font-medium">Lời nhắn lãng mạn</label>
+                    <textarea id="inputMessage" rows="3" class="w-full bg-black/40 border border-pink-500/30 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500 transition">You make my heart beat in every single second</textarea>
+                </div>
+
+                <div>
+                    <label class="block text-pink-200 mb-1 font-medium">Người gửi</label>
+                    <input type="text" id="inputSender" value="~ Từ trái tim Anh ~" class="w-full bg-black/40 border border-pink-500/30 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500 transition">
+                </div>
+
+                <hr class="border-pink-500/20">
+
+                <!-- Heart Effect Adjustments -->
+                <div>
+                    <label class="block text-pink-200 mb-1 font-medium">Tốc độ nhịp đập (Beat Speed)</label>
+                    <input type="range" id="speedSlider" min="0.5" max="2.5" step="0.1" value="1.2" class="w-full accent-pink-500">
+                </div>
+
+                <div>
+                    <label class="block text-pink-200 mb-1 font-medium">Màu sắc trái tim</label>
+                    <select id="colorSelect" class="w-full bg-black/40 border border-pink-500/30 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500">
+                        <option value="romantic">Hồng Đỏ Lãng Mạn</option>
+                        <option value="neon">Neon Tím Hồng</option>
+                        <option value="fire">Đỏ Lửa Đam Mê</option>
+                        <option value="cyan">Xanh Ngọc Huyền Sắc</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-pink-500/20">
+            <button id="applyBtn" class="w-full py-3 bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl font-semibold shadow-lg shadow-pink-600/30 hover:from-pink-500 hover:to-rose-500 transition-all text-white">
+                Cập nhật Hiệu Ứng
+            </button>
+        </div>
+    </div>
+
+    <!-- Audio Element (Free Royalty Ambient Music) -->
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://assets.mixkit.co/music/preview/mixkit-romantic-tango-132.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Application Script -->
+    <script>
+        // --- Global Variables & Config ---
+        let scene, camera, renderer, heartParticles, backgroundDust;
+        let particleCount = 18000;
+        let heartGeometry, heartMaterial;
+        let positions, originalPositions, colors, scales;
+        
+        let beatSpeed = 1.2;
+        let isMusicPlaying = false;
+        let currentTheme = 'romantic';
+
+        // Mouse Drag / Interaction Controls
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let targetRotationX = 0, targetRotationY = 0;
+        let currentRotationX = 0, currentRotationY = 0;
+
+        const canvas = document.getElementById('heartCanvas');
+
+        // Color Palettes
+        const colorPalettes = {
+            romantic: { inner: [1.0, 0.1, 0.4], outer: [1.0, 0.4, 0.7] },
+            neon:     { inner: [0.8, 0.0, 1.0], outer: [1.0, 0.2, 0.8] },
+            fire:     { inner: [1.0, 0.0, 0.1], outer: [1.0, 0.5, 0.0] },
+            cyan:     { inner: [0.0, 0.8, 1.0], outer: [0.8, 0.2, 1.0] }
+        };
+
+        // --- Initialize Three.js Scene ---
+        function initScene() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030008, 0.015);
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 42;
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Generate Heart Particles & Background Particles
+            createHeartParticles();
+            createBackgroundDust();
+
+            // Window Resize Listener
+            window.addEventListener('resize', onWindowResize);
+
+            // Pointer Interactions
+            setupInteractions();
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // --- Custom Heart Shape Math Formula 3D ---
+        // Generates 3D coordinates filling a heart volume
+        function getHeartPoint(t, u, scale = 1) {
+            // Parametric 3D Heart
+            // t range [0, PI*2], u range [-1, 1]
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+            const z = u * 6 * (1 - Math.pow(Math.sin(t), 2)); // 3D depth volume
+
+            return new THREE.Vector3(x * 0.8 * scale, y * 0.8 * scale, z * scale);
+        }
+
+        // Helper particle texture generation for soft glowing dots
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.2, 'rgba(255, 182, 193, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(255, 20, 147, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+
+            const texture = new THREE.Texture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // --- Create 3D Heart Particle Cloud ---
+        function createHeartParticles() {
+            if (heartParticles) scene.remove(heartParticles);
+
+            heartGeometry = new THREE.BufferGeometry();
+            positions = new Float32Array(particleCount * 3);
+            originalPositions = new Float32Array(particleCount * 3);
+            colors = new Float32Array(particleCount * 3);
+            scales = new Float32Array(particleCount);
+
+            const palette = colorPalettes[currentTheme];
+
+            for (let i = 0; i < particleCount; i++) {
+                // Random angle and depth variables
+                const t = Math.random() * Math.PI * 2;
+                const u = (Math.random() - 0.5) * 2;
+                // Add inner density distribution
+                const innerFactor = Math.pow(Math.random(), 0.6); 
+
+                const pt = getHeartPoint(t, u, innerFactor);
+
+                // Add slight noise to make it look organic/cloudy
+                const noiseX = (Math.random() - 0.5) * 0.8;
+                const noiseY = (Math.random() - 0.5) * 0.8;
+                const noiseZ = (Math.random() - 0.5) * 0.8;
+
+                const posX = pt.x + noiseX;
+                const posY = pt.y + noiseY;
+                const posZ = pt.z + noiseZ;
+
+                positions[i * 3] = posX;
+                positions[i * 3 + 1] = posY;
+                positions[i * 3 + 2] = posZ;
+
+                // Save base positions for animation reference
+                originalPositions[i * 3] = posX;
+                originalPositions[i * 3 + 1] = posY;
+                originalPositions[i * 3 + 2] = posZ;
+
+                // Color Interpolation (Inner to Outer)
+                const mixRatio = Math.min(1, Math.sqrt(posX*posX + posY*posY) / 15);
+                colors[i * 3]     = THREE.MathUtils.lerp(palette.inner[0], palette.outer[0], mixRatio);
+                colors[i * 3 + 1] = THREE.MathUtils.lerp(palette.inner[1], palette.outer[1], mixRatio);
+                colors[i * 3 + 2] = THREE.MathUtils.lerp(palette.inner[2], palette.outer[2], mixRatio);
+
+                // Random Particle Sizes
+                scales[i] = Math.random() * 0.8 + 0.2;
+            }
+
+            heartGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            heartGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            // Shader Material with glowing texture
+            heartMaterial = new THREE.PointsMaterial({
+                size: 0.9,
+                vertexColors: true,
+                map: createGlowTexture(),
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            heartParticles = new THREE.Points(heartGeometry, heartMaterial);
+            scene.add(heartParticles);
+        }
+
+        // --- Floating Background Stars/Dust ---
+        function createBackgroundDust() {
+            const count = 1200;
+            const dustGeo = new THREE.BufferGeometry();
+            const dustPos = new Float32Array(count * 3);
+            const dustColors = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                dustPos[i * 3]     = (Math.random() - 0.5) * 160;
+                dustPos[i * 3 + 1] = (Math.random() - 0.5) * 160;
+                dustPos[i * 3 + 2] = (Math.random() - 0.5) * 160;
+
+                dustColors[i * 3]     = 0.9;
+                dustColors[i * 3 + 1] = 0.5 + Math.random() * 0.4;
+                dustColors[i * 3 + 2] = 0.8;
+            }
+
+            dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+            dustGeo.setAttribute('color', new THREE.BufferAttribute(dustColors, 3));
+
+            const dustMat = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.5,
+                blending: THREE.AdditiveBlending
+            });
+
+            backgroundDust = new THREE.Points(dustGeo, dustMat);
+            scene.add(backgroundDust);
+        }
+
+        // --- Interactive Mouse Drag / Touch Rotation Setup ---
+        function setupInteractions() {
+            const onPointerDown = (e) => {
+                isDragging = true;
+                previousMousePosition = {
+                    x: e.clientX || (e.touches && e.touches[0].clientX),
+                    y: e.clientY || (e.touches && e.touches[0].clientY)
+                };
+
+                // Create visual ripple effect on click
+                if (e.clientX && e.clientY) {
+                    createSparkleEffect(e.clientX, e.clientY);
+                }
+            };
+
+            const onPointerMove = (e) => {
+                if (!isDragging) return;
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+                const deltaX = clientX - previousMousePosition.x;
+                const deltaY = clientY - previousMousePosition.y;
+
+                targetRotationY += deltaX * 0.008;
+                targetRotationX += deltaY * 0.008;
+
+                previousMousePosition = { x: clientX, y: clientY };
+            };
+
+            const onPointerUp = () => {
+                isDragging = false;
+            };
+
+            window.addEventListener('mousedown', onPointerDown);
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+
+            window.addEventListener('touchstart', onPointerDown, { passive: true });
+            window.addEventListener('touchmove', onPointerMove, { passive: true });
+            window.addEventListener('touchend', onPointerUp);
+        }
+
+        // Click Ripple Wave Effect
+        function createSparkleEffect(x, y) {
+            const wave = document.createElement('div');
+            wave.className = 'click-wave';
+            wave.style.left = `${x}px`;
+            wave.style.top = `${y}px`;
+            document.body.appendChild(wave);
+
+            setTimeout(() => {
+                wave.remove();
+            }, 800);
+        }
+
+        // Window Resize Handler
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Main Animation Loop ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime() * beatSpeed;
+
+            // Heartbeat Logic (Mathematical Pulsating)
+            // Double beat rhythm: sin(t) + harmonic beat
+            const beatScale = 1 + Math.sin(time * 3) * 0.08 + Math.pow(Math.sin(time * 3), 10) * 0.12;
+
+            const posArr = heartGeometry.attributes.position.array;
+
+            for (let i = 0; i < particleCount; i++) {
+                const idx = i * 3;
+                const vx = originalPositions[idx];
+                const vy = originalPositions[idx + 1];
+                const vz = originalPositions[idx + 2];
+
+                // Dynamic wave disturbance across the particles
+                const wave = Math.sin(time * 4 + vy * 0.2) * 0.3;
+
+                posArr[idx]     = vx * beatScale + (vx / 10) * wave;
+                posArr[idx + 1] = vy * beatScale + (vy / 10) * wave;
+                posArr[idx + 2] = vz * beatScale + (vz / 10) * wave;
+            }
+
+            heartGeometry.attributes.position.needsUpdate = true;
+
+            // Smooth Interpolated Rotation (Damping)
+            currentRotationX += (targetRotationX - currentRotationX) * 0.05;
+            currentRotationY += (targetRotationY - currentRotationY) * 0.05;
+
+            // Base Idle Rotation + Mouse Interaction Rotation
+            if (heartParticles) {
+                heartParticles.rotation.y = currentRotationY + time * 0.15;
+                heartParticles.rotation.x = currentRotationX + Math.sin(time * 0.5) * 0.05;
+            }
+
+            // Slowly rotate background dust for depth
+            if (backgroundDust) {
+                backgroundDust.rotation.y = time * 0.02;
+                backgroundDust.rotation.x = time * 0.01;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- UI & Controls Handling ---
+        const configModal = document.getElementById('configModal');
+        const configToggle = document.getElementById('configToggle');
+        const closeConfig = document.getElementById('closeConfig');
+        const applyBtn = document.getElementById('applyBtn');
+
+        const musicToggle = document.getElementById('musicToggle');
+        const musicIcon = document.getElementById('musicIcon');
+        const bgMusic = document.getElementById('bgMusic');
+
+        // Toggle Config Drawer
+        configToggle.addEventListener('click', () => {
+            configModal.classList.remove('translate-x-full');
+        });
+
+        closeConfig.addEventListener('click', () => {
+            configModal.classList.add('translate-x-full');
+        });
+
+        // Toggle Background Music
+        musicToggle.addEventListener('click', () => {
+            if (isMusicPlaying) {
+                bgMusic.pause();
+                musicIcon.className = "fa-solid fa-music text-lg";
+                musicToggle.classList.remove('border-pink-400', 'text-white');
+            } else {
+                bgMusic.play().then(() => {
+                    musicIcon.className = "fa-solid fa-volume-high text-lg text-pink-400 animate-bounce";
+                    musicToggle.classList.add('border-pink-400', 'text-white');
+                }).catch(() => {
+                    console.log("Audio playback user gesture required");
+                });
+            }
+            isMusicPlaying = !isMusicPlaying;
+        });
+
+        // Apply Config Changes
+        applyBtn.addEventListener('click', () => {
+            // Update Card Text
+            document.getElementById('recipientDisplay').innerText = document.getElementById('inputRecipient').value;
+            document.getElementById('romanticMessage').innerText = `"${document.getElementById('inputMessage').value}"`;
+            document.getElementById('senderDisplay').innerText = document.getElementById('inputSender').value;
+
+            // Update Beat Speed
+            beatSpeed = parseFloat(document.getElementById('speedSlider').value);
+
+            // Update Color Theme if changed
+            const selectedTheme = document.getElementById('colorSelect').value;
+            if (selectedTheme !== currentTheme) {
+                currentTheme = selectedTheme;
+                createHeartParticles();
+            }
+
+            // Close Modal
+            configModal.classList.add('translate-x-full');
+        });
+
+        // Initialize on Window Load
+        window.onload = () => {
+            initScene();
+
+            // Fade hint after 5 seconds
+            setTimeout(() => {
+                const hint = document.getElementById('hintText');
+                if (hint) hint.style.opacity = '0.2';
+            }, 5000);
+        };
+    </script>
+</body>
+</html>
